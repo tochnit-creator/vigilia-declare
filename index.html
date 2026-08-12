@@ -389,6 +389,19 @@
     btn.disabled = true;
     btn.textContent = 'Enviando...';
 
+    function enviarComoFallback(){
+      return fetch(WEBAPP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ nome: nome, telefone: telefone, email: email, observacao: observacao })
+      }).then(function(){
+        document.getElementById('protocoloNumero').textContent = 'enviado por e-mail';
+        document.getElementById('formBody').classList.add('hide');
+        document.getElementById('successBox').classList.add('show');
+      });
+    }
+
     fetch(WEBAPP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight de CORS
@@ -407,7 +420,10 @@
         }
       })
       .catch(function(){
-        showFormError('Falha de conexão. Verifique sua internet e tente novamente.');
+        // provável bloqueio de CORS na leitura da resposta — tenta um envio alternativo
+        return enviarComoFallback().catch(function(){
+          showFormError('Falha de conexão. Verifique sua internet e tente novamente.');
+        });
       })
       .finally(function(){
         btn.disabled = false;
