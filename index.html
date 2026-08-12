@@ -310,6 +310,7 @@
         </div>
 
         <button type="submit" class="submit" id="submitBtn">Confirmar presença</button>
+        <div id="formError" style="display:none; margin-top:14px; font-size:13px; color:#e08a8a; text-align:center;"></div>
       </form>
     </div>
 
@@ -321,7 +322,8 @@
       </div>
       <h2>Presença registrada</h2>
       <p>Sua inscrição para a Vigília Declare foi enviada.</p>
-      <p>Seu número de protocolo chega em instantes no e-mail informado.</p>
+      <p>Seu número de protocolo é <strong id="protocoloNumero" style="color:var(--gold-soft);">—</strong></p>
+      <p>Guarde esse número — ele também chega no e-mail informado.</p>
     </div>
   </div>
 
@@ -347,14 +349,8 @@
     }
   })();
 
-  // envio para o Google Forms por trás
-  var FORM_ACTION = 'https://docs.google.com/forms/d/e/1FAIpQLSeuld5HfvUkfOi-l-TdziIWxVT5MKbee-uuUIVc7yuI8Rr7qQ/formResponse';
-  var ENTRY = {
-    nome: 'entry.1185722029',
-    telefone: 'entry.478776452',
-    email: 'entry.1136371982',
-    observacao: 'entry.712016469'
-  };
+  // envio para o Web App do Apps Script (protocolo, planilha e e-mails ficam por conta dele)
+  var WEBAPP_URL = 'https://script.google.com/macros/s/AKfycby_-kKQHcyDASddU7WmMENNQleJDupG55w-OQJQNASfUvdLUSQ099G4e_UoFNRIOLksAQ/exec';
 
   var form = document.getElementById('vigiliaForm');
   var btn = document.getElementById('submitBtn');
@@ -365,8 +361,18 @@
 
   function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 
+  function showFormError(msg){
+    var el = document.getElementById('formError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function hideFormError(){
+    document.getElementById('formError').style.display = 'none';
+  }
+
   form.addEventListener('submit', function(e){
     e.preventDefault();
+    hideFormError();
 
     var nome = document.getElementById('nome').value.trim();
     var telefone = document.getElementById('telefone').value.trim();
@@ -383,23 +389,29 @@
     btn.disabled = true;
     btn.textContent = 'Enviando...';
 
-    var body = new URLSearchParams();
-    body.append(ENTRY.nome, nome);
-    body.append(ENTRY.telefone, telefone);
-    body.append(ENTRY.email, email);
-    body.append(ENTRY.observacao, observacao);
-
-    fetch(FORM_ACTION, {
+    fetch(WEBAPP_URL, {
       method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString()
-    }).catch(function(){ /* opaque no-cors: seguimos mesmo sem confirmação de rede */ })
-      .finally(function(){
-        setTimeout(function(){
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight de CORS
+      body: JSON.stringify({ nome: nome, telefone: telefone, email: email, observacao: observacao })
+    })
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if (data && data.ok) {
+          document.getElementById('protocoloNumero').textContent = data.protocolo;
           document.getElementById('formBody').classList.add('hide');
           document.getElementById('successBox').classList.add('show');
-        }, 700);
+        } else if (data && data.erro === 'vagas_esgotadas') {
+          showFormError('As vagas para a Vigília Declare se esgotaram.');
+        } else {
+          showFormError('Não conseguimos confirmar sua inscrição agora. Tente novamente em instantes.');
+        }
+      })
+      .catch(function(){
+        showFormError('Falha de conexão. Verifique sua internet e tente novamente.');
+      })
+      .finally(function(){
+        btn.disabled = false;
+        btn.textContent = 'Confirmar presença';
       });
   });
 </script>
